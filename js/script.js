@@ -53,9 +53,141 @@
   }
 
   /* ====================================================
-     INTERSECTION OBSERVER — Scroll Reveal Animations
-     Replaces AOS + GSAP ScrollTrigger entirely
+     ENHANCED ANIMATION SYSTEM — Scroll-Based Animations
+     Supports fade, slide, stagger, and repeat-on-scroll
      ==================================================== */
+
+  // Check if user prefers reduced motion
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /**
+   * Universal Animation Observer
+   * Handles all scroll-triggered animations (fade, slide, stagger, scale)
+   * Data attributes: data-animation, data-repeat, data-delay, data-threshold
+   */
+  function initAnimationObserver() {
+    // Select all elements with animation classes or data-animation attribute
+    const animatedElements = document.querySelectorAll(
+      '[class*="fade-in"], [class*="fade-out"], [class*="slide-in"], [class*="slide-out"], [class*="scale-in"], [class*="scale-out"], [data-animation]'
+    );
+
+    if (animatedElements.length === 0) return;
+
+    const observerOptions = {
+      threshold: 0.1,
+      rootMargin: '0px 0px -50px 0px'
+    };
+
+    const animationObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        const repeatMode = entry.target.dataset.repeat || 'once';
+        const shouldAnimate = entry.isIntersecting;
+
+        // Apply reduced motion setting
+        if (prefersReducedMotion) {
+          if (shouldAnimate) {
+            entry.target.classList.add('active');
+          }
+          return;
+        }
+
+        if (shouldAnimate) {
+          // Trigger animation
+          entry.target.classList.add('active');
+
+          // Only animate once unless data-repeat="scroll" is set
+          if (repeatMode === 'once') {
+            animationObserver.unobserve(entry.target);
+          }
+        } else if (repeatMode === 'scroll') {
+          // Allow fade-out when leaving viewport (optional reverse animation)
+          entry.target.classList.remove('active');
+        }
+      });
+    }, observerOptions);
+
+    animatedElements.forEach(el => {
+      // Set initial state for elements (already handled by CSS, but can be explicitly set)
+      if (!el.classList.contains('active')) {
+        animationObserver.observe(el);
+      }
+    });
+  }
+
+  /**
+   * Stagger Animation Handler
+   * Automatically adds incremented delays to .stagger-item elements
+   */
+  function initStaggerAnimations() {
+    const staggerGroups = document.querySelectorAll('[class*="stagger"]');
+
+    staggerGroups.forEach(group => {
+      const items = group.querySelectorAll('.stagger-item');
+      items.forEach((item, index) => {
+        // Set CSS custom property for stagger timing
+        item.style.setProperty('--stagger-index', index);
+        // Also apply transition delays programmatically as fallback
+        item.style.transitionDelay = `${index * 0.1}s`;
+      });
+    });
+
+    // Also handle direct .stagger-item elements (not in a group)
+    const directStaggerItems = document.querySelectorAll('.stagger-item:not([class*="stagger-"])');
+    directStaggerItems.forEach((item, index) => {
+      item.style.setProperty('--stagger-index', index);
+      item.style.transitionDelay = `${index * 0.1}s`;
+    });
+  }
+
+  /**
+   * Data Attribute Animation Support
+   * Allows using data-animation="fade-in" instead of class names
+   */
+  function initDataAttributeAnimations() {
+    const dataAnimElements = document.querySelectorAll('[data-animation]');
+
+    dataAnimElements.forEach(el => {
+      const animationType = el.dataset.animation;
+      const duration = el.dataset.duration;
+      const delay = el.dataset.delay;
+
+      // Apply animation class based on data attribute
+      if (animationType) {
+        el.classList.add(animationType);
+      }
+
+      // Apply duration class if specified
+      if (duration) {
+        if (duration === 'fast') el.classList.add('anim-fast');
+        else if (duration === 'slow') el.classList.add('anim-slow');
+        else el.classList.add('anim-normal');
+      }
+
+      // Apply delay if specified
+      if (delay) {
+        el.style.transitionDelay = `${parseInt(delay)}ms`;
+      }
+    });
+  }
+
+  // Initialize all animation systems
+  if (!prefersReducedMotion) {
+    initAnimationObserver();
+    initStaggerAnimations();
+    initDataAttributeAnimations();
+  } else {
+    // If reduced motion is preferred, immediately show all elements
+    document.querySelectorAll(
+      '[class*="fade-in"], [class*="fade-out"], [class*="slide-in"], [class*="slide-out"], [class*="scale-in"], [class*="scale-out"]'
+    ).forEach(el => {
+      el.classList.add('active');
+    });
+  }
+
+  /**
+   * Legacy Support: Original [data-reveal] system
+   * Kept for backward compatibility
+   */
   const revealElements = document.querySelectorAll('[data-reveal]');
   if (revealElements.length > 0) {
     const revealObserver = new IntersectionObserver((entries) => {
